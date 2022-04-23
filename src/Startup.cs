@@ -25,7 +25,10 @@ namespace Dtlaw.Identity
             services.Configure<AzureFileLoggerOptions>(Configuration.GetSection("AzureLogging"));
             //services.AddSwaggerGen();
             services.AddDbContext<IdentityContext>(options => options.UseSqlServer(Configuration.GetConnectionString("IdentityDbConnection")));
-            services.AddIdentity<IdentityUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
+            services.AddIdentity<IdentityUser, IdentityRole>(options => 
+                {
+                    options.SignIn.RequireConfirmedAccount = true;
+                })
                 .AddEntityFrameworkStores<IdentityContext>();
             services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGrid.ApiKey"));
         }

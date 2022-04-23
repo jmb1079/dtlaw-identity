@@ -8,14 +8,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Dtlaw.Identity.Model
 {
-    public class RegistrationDto
+    public class RegistrationDto : UserDto
     {
-        public string Email { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public DateTime? DateOfBirth { get; set; }
         public string? MobilePhone { get; set; }
-        public string Password { get; set; }
         public string Organization { get; set; }
     }
 }

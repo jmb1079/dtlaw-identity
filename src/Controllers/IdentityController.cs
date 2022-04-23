@@ -50,9 +50,9 @@ namespace Dtlaw.Identity.Controllers
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto )
+        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto, string? returnUrl = null )
         {
-            var returnUrl = Url.Content("~/");
+            returnUrl ??= Url.Content("~/");
             //ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
             var user = CreateUser();
             await _userStore.SetUserNameAsync(user, registrationDto.Email, CancellationToken.None);
@@ -79,6 +79,36 @@ namespace Dtlaw.Identity.Controllers
                 }
             }
             return Problem(statusCode:503);
+        }
+
+        [AllowAnonymous]
+        [HttpPost("authenticate")]
+        public async Task<IActionResult> Authenticate([FromBody]LoginDto loginDto, string? returnUrl = null)
+        {
+            returnUrl ??= Url.Content("~/");
+            var result = await _signInManager.PasswordSignInAsync(loginDto.Email, loginDto.Password, loginDto.RememberMe, lockoutOnFailure: false);
+            if(result.Succeeded)
+            {
+                _logger.LogInformation(String.Format("User '{0}' logged in", loginDto.Email));
+                return LocalRedirect(returnUrl);
+            }
+            if(result.RequiresTwoFactor)
+            {
+                _logger.LogError(String.Format("Multifactor Authentication attempted for login '{0}'. This feature is not implemented", loginDto.Email));
+                return Problem(statusCode: 501, title: "MFA not supported");
+            }
+            if(result.IsLockedOut)
+            {
+                string errorDetail = String.Format("User account '{0}' is locked. Contact an administrator to unlock the account");
+                _logger.LogInformation(errorDetail);
+                return Problem( statusCode: 403, title: "Account locked", detail: errorDetail);
+            }
+            else
+            {
+                string errorDetail = String.Format("Invalid login attempt for '{0}'", loginDto.Email);
+                _logger.LogWarning(errorDetail);
+                return Problem( statusCode: 401, title: "Login failed", detail: errorDetail);
+            }
         }
 
         private async void AddUserClaims(IdentityUser user, RegistrationDto registrationDto)
