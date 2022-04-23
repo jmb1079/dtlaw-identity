@@ -50,26 +50,26 @@ namespace Dtlaw.Identity.Controllers
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] UserDto userDto )
+        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto )
         {
             var returnUrl = Url.Content("~/");
             //ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
             var user = CreateUser();
-            await _userStore.SetUserNameAsync(user, userDto.Email, CancellationToken.None);
-            await _emailStore.SetEmailAsync(user, userDto.Email, CancellationToken.None);
-            var result = await _userManager.CreateAsync(user, userDto.Password);
+            await _userStore.SetUserNameAsync(user, registrationDto.Email, CancellationToken.None);
+            await _emailStore.SetEmailAsync(user, registrationDto.Email, CancellationToken.None);
+            var result = await _userManager.CreateAsync(user, registrationDto.Password);
             if (result.Succeeded)
             {
-                _logger.LogInformation("User " + userDto.Email + "created a new account with password.");
-                AddUserClaims(user, userDto);
-                AddUserToRole(user, userDto.Organization);
+                _logger.LogInformation("User " + registrationDto.Email + "created a new account with password.");
+                AddUserClaims(user, registrationDto);
+                AddUserToRole(user, registrationDto.Organization);
                 SendRegistrationEmail(user, returnUrl);
                 if (_userManager.Options.SignIn.RequireConfirmedAccount)
                 {
                     return Problem(
                         title: "Registration not confirmed",
                         statusCode: 403,
-                        detail: "The user started the registration process, but has not confirmed the email registered (" + userDto.Email + "). The user must click the link in the 'DTLAW email confirmation' email to complete the registration process."
+                        detail: "The user started the registration process, but has not confirmed the email registered (" + registrationDto.Email + "). The user must click the link in the 'DTLAW email confirmation' email to complete the registration process."
                     );
                 }
                 else
@@ -81,13 +81,13 @@ namespace Dtlaw.Identity.Controllers
             return Problem(statusCode:503);
         }
 
-        private async void AddUserClaims(IdentityUser user, UserDto userDto)
+        private async void AddUserClaims(IdentityUser user, RegistrationDto registrationDto)
         {
             List<Claim> newClaims = new List<Claim>();
-            if (!String.IsNullOrEmpty(userDto.FirstName)){newClaims.Add(new Claim(ClaimTypes.GivenName, userDto.FirstName));}
-            if (!String.IsNullOrEmpty(userDto.LastName)){newClaims.Add(new Claim(ClaimTypes.Surname, userDto.LastName));}
-            if (userDto.DateOfBirth.HasValue){newClaims.Add(new Claim(ClaimTypes.DateOfBirth, userDto.DateOfBirth.Value.ToShortDateString()));}
-            if (!String.IsNullOrEmpty(userDto.MobilePhone)){newClaims.Add(new Claim(ClaimTypes.MobilePhone, userDto.MobilePhone));}
+            if (!String.IsNullOrEmpty(registrationDto.FirstName)){newClaims.Add(new Claim(ClaimTypes.GivenName, registrationDto.FirstName));}
+            if (!String.IsNullOrEmpty(registrationDto.LastName)){newClaims.Add(new Claim(ClaimTypes.Surname, registrationDto.LastName));}
+            if (registrationDto.DateOfBirth.HasValue){newClaims.Add(new Claim(ClaimTypes.DateOfBirth, registrationDto.DateOfBirth.Value.ToShortDateString()));}
+            if (!String.IsNullOrEmpty(registrationDto.MobilePhone)){newClaims.Add(new Claim(ClaimTypes.MobilePhone, registrationDto.MobilePhone));}
             var result = await _userManager.AddClaimsAsync(user, newClaims);
             if (result.Succeeded)
             {

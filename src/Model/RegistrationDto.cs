@@ -8,7 +8,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Dtlaw.Identity.Model
 {
-    public class UserDto
+    public class RegistrationDto
     {
         public string Email { get; set; }
         public string? FirstName { get; set; }
