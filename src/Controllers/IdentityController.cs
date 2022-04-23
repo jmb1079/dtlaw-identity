@@ -83,13 +83,11 @@ namespace Dtlaw.Identity.Controllers
 
         private async void AddUserClaims(IdentityUser user, UserDto userDto)
         {
-            var newClaims = new List<Claim>()
-                {
-                    new Claim(ClaimTypes.GivenName, userDto.FirstName),
-                    new Claim(ClaimTypes.Surname, userDto.LastName),
-                    new Claim(ClaimTypes.DateOfBirth, userDto.DateOfBirth.ToShortDateString()),
-                    new Claim(ClaimTypes.MobilePhone, userDto.MobilePhone)
-                };
+            List<Claim> newClaims = new List<Claim>();
+            if (!String.IsNullOrEmpty(userDto.FirstName)){newClaims.Add(new Claim(ClaimTypes.GivenName, userDto.FirstName));}
+            if (!String.IsNullOrEmpty(userDto.LastName)){newClaims.Add(new Claim(ClaimTypes.Surname, userDto.LastName));}
+            if (userDto.DateOfBirth.HasValue){newClaims.Add(new Claim(ClaimTypes.DateOfBirth, userDto.DateOfBirth.Value.ToShortDateString()));}
+            if (!String.IsNullOrEmpty(userDto.MobilePhone)){newClaims.Add(new Claim(ClaimTypes.MobilePhone, userDto.MobilePhone));}
             var result = await _userManager.AddClaimsAsync(user, newClaims);
             if (result.Succeeded)
             {
