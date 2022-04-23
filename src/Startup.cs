@@ -31,7 +31,7 @@ namespace Dtlaw.Identity
                 })
                 .AddEntityFrameworkStores<IdentityContext>()
                 .AddDefaultTokenProviders();
-            services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGrid.ApiKey"));
+            services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGrid:ApiKey"));
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
