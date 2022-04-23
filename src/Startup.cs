@@ -29,7 +29,8 @@ namespace Dtlaw.Identity
                 {
                     options.SignIn.RequireConfirmedAccount = true;
                 })
-                .AddEntityFrameworkStores<IdentityContext>();
+                .AddEntityFrameworkStores<IdentityContext>()
+                .AddDefaultTokenProviders();
             services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGrid.ApiKey"));
         }
 

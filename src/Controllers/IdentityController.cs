@@ -83,14 +83,19 @@ namespace Dtlaw.Identity.Controllers
 
         [AllowAnonymous]
         [HttpPost("authenticate")]
-        public async Task<IActionResult> Authenticate([FromBody]LoginDto loginDto, string? returnUrl = null)
+        public async Task<IActionResult> Authenticate([FromBody]LoginDto loginDto)
         {
-            returnUrl ??= Url.Content("~/");
             var result = await _signInManager.PasswordSignInAsync(loginDto.Email, loginDto.Password, loginDto.RememberMe, lockoutOnFailure: false);
             if(result.Succeeded)
             {
                 _logger.LogInformation(String.Format("User '{0}' logged in", loginDto.Email));
-                return LocalRedirect(returnUrl);
+                var user = await _userManager.FindByNameAsync(loginDto.Email);
+                var token = await _userManager.GenerateUserTokenAsync(user,TokenOptions.DefaultAuthenticatorProvider, "API");
+                return Ok( new
+                {
+                    Username = loginDto.Email,
+                    Token = token
+                });
             }
             if(result.RequiresTwoFactor)
             {
@@ -109,6 +114,14 @@ namespace Dtlaw.Identity.Controllers
                 _logger.LogWarning(errorDetail);
                 return Problem( statusCode: 401, title: "Login failed", detail: errorDetail);
             }
+        }
+
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            await _signInManager.SignOutAsync();
+            _logger.LogInformation(String.Format("User '' logged out"));
+            return Ok();
         }
 
         private async void AddUserClaims(IdentityUser user, RegistrationDto registrationDto)
