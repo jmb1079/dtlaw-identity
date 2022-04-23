@@ -7,6 +7,7 @@ using SendGrid;
 using Microsoft.AspNetCore.Authentication;
 using SendGrid.Helpers.Mail;
 using System.Text.Encodings.Web;
+using System.Security.Claims;
 
 namespace Dtlaw.Identity.Controllers
 {
@@ -60,26 +61,9 @@ namespace Dtlaw.Identity.Controllers
             if (result.Succeeded)
             {
                 _logger.LogInformation("User " + userDto.Email + "created a new account with password.");
-                IdentityRole role = await _roleManager.FindByIdAsync(userDto.Organization);
-                result = await _userManager.AddToRoleAsync(user, role.NormalizedName);
-                var userId = await _userManager.GetUserIdAsync(user);
-                var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                var callbackUrl = Url.Page(
-                    "/Account/ConfirmEmail",
-                    pageHandler: null,
-                    values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
-                    protocol: Request.Scheme);
-                var content = $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.";
-                var message = MailHelper.CreateSingleEmail(
-                    new EmailAddress(_configuration.GetValue<string>("SendGrid.FromAddress")),
-                    new EmailAddress(userDto.Email), 
-                    _configuration.GetValue<string>("SendGrid.Subject"),
-                    content,
-                    content);
-                var response = await _emailSender.SendEmailAsync(message);
-                _logger.LogInformation(response.IsSuccessStatusCode 
-                               ? $"Email to {userDto.Email} queued successfully!"
-                               : $"Failure Email to {userDto.Email}");
+                AddUserClaims(user, userDto);
+                AddUserToRole(user, userDto.Organization);
+                SendRegistrationEmail(user, returnUrl);
                 if (_userManager.Options.SignIn.RequireConfirmedAccount)
                 {
                     return Problem(
@@ -95,6 +79,64 @@ namespace Dtlaw.Identity.Controllers
                 }
             }
             return Problem(statusCode:503);
+        }
+
+        private async void AddUserClaims(IdentityUser user, UserDto userDto)
+        {
+            var newClaims = new List<Claim>()
+                {
+                    new Claim(ClaimTypes.GivenName, userDto.FirstName),
+                    new Claim(ClaimTypes.Surname, userDto.LastName),
+                    new Claim(ClaimTypes.DateOfBirth, userDto.DateOfBirth.ToShortDateString()),
+                    new Claim(ClaimTypes.MobilePhone, userDto.MobilePhone)
+                };
+            var result = await _userManager.AddClaimsAsync(user, newClaims);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation(String.Format("Claims added for user '{0}'", user.Email));
+            }
+            else
+            {
+                _logger.LogCritical(String.Format("Failed to add claims for user '{0}'", user.Email));
+                _logger.LogCritical(result.Errors.ToString());
+            }
+        }
+
+        private async void AddUserToRole(IdentityUser user, string organization)
+        {
+            IdentityRole role = await _roleManager.FindByIdAsync(organization);
+            var result = await _userManager.AddToRoleAsync(user, role.NormalizedName);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation(String.Format("User '{0}' added to role '{1}'", user.Email, role.Name));
+            }
+            else
+            {
+                _logger.LogCritical(String.Format("User '{0}' failed to get added to role '{1}'", user.Email, role.Name));
+                _logger.LogCritical(result.ToString());
+            }
+        }
+
+        private async void SendRegistrationEmail(IdentityUser user, string returnUrl)
+        {
+            var userId = await _userManager.GetUserIdAsync(user);
+            var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var callbackUrl = Url.Page(
+                "/Account/ConfirmEmail",
+                pageHandler: null,
+                values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
+                protocol: Request.Scheme);
+            var content = $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.";
+            var message = MailHelper.CreateSingleEmail(
+                new EmailAddress(_configuration.GetValue<string>("SendGrid.FromAddress")),
+                new EmailAddress(user.Email),
+                _configuration.GetValue<string>("SendGrid.Subject"),
+                content,
+                content);
+            var response = await _emailSender.SendEmailAsync(message);
+            _logger.LogInformation(response.IsSuccessStatusCode
+                           ? $"Email to {user.Email} queued successfully!"
+                           : $"Failed to send email to {user.Email}");
         }
 
         private IdentityUser CreateUser()
