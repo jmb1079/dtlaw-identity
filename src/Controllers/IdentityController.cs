@@ -16,7 +16,6 @@ namespace Dtlaw.Identity.Controllers
     {
         private readonly IdentityContext _context;
         private readonly IUserStore<IdentityUser> _userStore;
-        private readonly IUserEmailStore<IdentityUser> _emailStore;
         private readonly UserManager<IdentityUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SignInManager<IdentityUser> _signInManager;
@@ -26,7 +25,6 @@ namespace Dtlaw.Identity.Controllers
 
         public IdentityController(IdentityContext context,
             IUserStore<IdentityUser> userStore,
-            IUserEmailStore<IdentityUser> emailStore,
             UserManager<IdentityUser> userManager,
             RoleManager<IdentityRole> roleManager,
             SignInManager<IdentityUser> signInManager,
@@ -36,7 +34,6 @@ namespace Dtlaw.Identity.Controllers
         {
             _context = context;
             _userStore = userStore;
-            _emailStore = emailStore;
             _userManager = userManager;
             _roleManager = roleManager;
             _signInManager = signInManager;
@@ -56,21 +53,18 @@ namespace Dtlaw.Identity.Controllers
             //ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
             var user = CreateUser();
             await _userStore.SetUserNameAsync(user, registrationDto.Email, CancellationToken.None);
-            await _emailStore.SetEmailAsync(user, registrationDto.Email, CancellationToken.None);
+            await _userManager.SetEmailAsync(user, registrationDto.Email);
             var result = await _userManager.CreateAsync(user, registrationDto.Password);
             if (result.Succeeded)
             {
-                _logger.LogInformation("User " + registrationDto.Email + "created a new account with password.");
-                AddUserClaims(user, registrationDto);
-                AddUserToRole(user, registrationDto.Organization);
-                SendRegistrationEmail(user, returnUrl);
-                if (_userManager.Options.SignIn.RequireConfirmedAccount)
+                _logger.LogInformation("Created a new account with password for '" + registrationDto.Email + "'.");
+                await AddUserClaims(user, registrationDto);
+                await AddUserToRole(user, registrationDto.Organization);
+                await SendRegistrationEmail(user, returnUrl);
+                if ( _userManager.Options.SignIn.RequireConfirmedAccount)
                 {
-                    return Problem(
-                        title: "Registration not confirmed",
-                        statusCode: 403,
-                        detail: "The user started the registration process, but has not confirmed the email registered (" + registrationDto.Email + "). The user must click the link in the 'DTLAW email confirmation' email to complete the registration process."
-                    );
+                    //Finished initial process correctly and needs client to confirm by email;
+                    return Ok();
                 }
                 else
                 {
@@ -124,7 +118,7 @@ namespace Dtlaw.Identity.Controllers
             return Ok();
         }
 
-        private async void AddUserClaims(IdentityUser user, RegistrationDto registrationDto)
+        private async Task<bool> AddUserClaims(IdentityUser user, RegistrationDto registrationDto)
         {
             List<Claim> newClaims = new List<Claim>();
             if (!String.IsNullOrEmpty(registrationDto.FirstName)){newClaims.Add(new Claim(ClaimTypes.GivenName, registrationDto.FirstName));}
@@ -135,30 +129,36 @@ namespace Dtlaw.Identity.Controllers
             if (result.Succeeded)
             {
                 _logger.LogInformation(String.Format("Claims added for user '{0}'", user.Email));
+                return true;
             }
             else
             {
                 _logger.LogCritical(String.Format("Failed to add claims for user '{0}'", user.Email));
                 _logger.LogCritical(result.Errors.ToString());
+                return false;
             }
         }
 
-        private async void AddUserToRole(IdentityUser user, string organization)
+        private async Task<bool> AddUserToRole(IdentityUser user, string organization)
         {
+            Console.WriteLine(organization);
             IdentityRole role = await _roleManager.FindByIdAsync(organization);
+            Console.WriteLine(role.Name);
             var result = await _userManager.AddToRoleAsync(user, role.NormalizedName);
             if (result.Succeeded)
             {
                 _logger.LogInformation(String.Format("User '{0}' added to role '{1}'", user.Email, role.Name));
+                return true;
             }
             else
             {
                 _logger.LogCritical(String.Format("User '{0}' failed to get added to role '{1}'", user.Email, role.Name));
                 _logger.LogCritical(result.ToString());
+                return false;
             }
         }
 
-        private async void SendRegistrationEmail(IdentityUser user, string returnUrl)
+        private async Task<bool> SendRegistrationEmail(IdentityUser user, string returnUrl)
         {
             var userId = await _userManager.GetUserIdAsync(user);
             var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -169,15 +169,22 @@ namespace Dtlaw.Identity.Controllers
                 protocol: Request.Scheme);
             var content = $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.";
             var message = MailHelper.CreateSingleEmail(
-                new EmailAddress(_configuration.GetValue<string>("SendGrid.FromAddress")),
+                new EmailAddress(_configuration.GetValue<string>("SendGrid:FromAddress")),
                 new EmailAddress(user.Email),
-                _configuration.GetValue<string>("SendGrid.Subject"),
+                _configuration.GetValue<string>("SendGrid:Subject"),
                 content,
                 content);
             var response = await _emailSender.SendEmailAsync(message);
-            _logger.LogInformation(response.IsSuccessStatusCode
-                           ? $"Email to {user.Email} queued successfully!"
-                           : $"Failed to send email to {user.Email}");
+            if(response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation($"Email to {user.Email} queued successfully!");
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning($"Failed to send email to {user.Email}");
+                return false;
+            }
         }
 
         private IdentityUser CreateUser()
