@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.AzureAppServices;
+using Microsoft.AspNetCore.Identity;
+using SendGrid;
+using SendGrid.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 using Dtlaw.Identity.Data;
-using Microsoft.AspNetCore.Identity;
 
 namespace Dtlaw.Identity
 {
@@ -21,9 +24,10 @@ namespace Dtlaw.Identity
             services.AddEndpointsApiExplorer();
             services.Configure<AzureFileLoggerOptions>(Configuration.GetSection("AzureLogging"));
             //services.AddSwaggerGen();
-            services.AddDbContext<IdentityDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("IdentityDbConnection")));
+            services.AddDbContext<IdentityContext>(options => options.UseSqlServer(Configuration.GetConnectionString("IdentityDbConnection")));
             services.AddIdentity<IdentityUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
-                .AddEntityFrameworkStores<IdentityDbContext>();
+                .AddEntityFrameworkStores<IdentityContext>();
+            services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGridApiKey"));
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

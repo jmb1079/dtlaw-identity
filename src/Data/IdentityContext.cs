@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Dtlaw.Identity.Data
 {
-    public class IdentityDbContext : IdentityDbContext<IdentityUser>
+    public class IdentityContext : IdentityDbContext<IdentityUser>
     {
-        public IdentityDbContext(DbContextOptions options)
+        public IdentityContext(DbContextOptions options)
             : base(options)
         {
         }
