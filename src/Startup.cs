@@ -27,7 +27,7 @@ namespace Dtlaw.Identity
             services.AddDbContext<IdentityContext>(options => options.UseSqlServer(Configuration.GetConnectionString("IdentityDbConnection")));
             services.AddIdentity<IdentityUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
                 .AddEntityFrameworkStores<IdentityContext>();
-            services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGridApiKey"));
+            services.AddSendGrid(options => options.ApiKey = Configuration.GetValue<string>("SendGrid.ApiKey"));
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

@@ -21,6 +21,7 @@ namespace Dtlaw.Identity.Controllers
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly ISendGridClient _emailSender;
         private readonly ILogger<IdentityController> _logger;
+        private readonly IConfiguration _configuration;
 
         public IdentityController(IdentityContext context,
             IUserStore<IdentityUser> userStore,
@@ -29,7 +30,8 @@ namespace Dtlaw.Identity.Controllers
             RoleManager<IdentityRole> roleManager,
             SignInManager<IdentityUser> signInManager,
             ISendGridClient emailSender,
-            ILogger<IdentityController> logger)
+            ILogger<IdentityController> logger,
+            IConfiguration configuration)
         {
             _context = context;
             _userStore = userStore;
@@ -39,6 +41,7 @@ namespace Dtlaw.Identity.Controllers
             _signInManager = signInManager;
             _emailSender = emailSender;
             _logger = logger;
+            _configuration = configuration;
         }
 
         //public IList<AuthenticationScheme> ExternalLogins { get; set; }
@@ -66,13 +69,17 @@ namespace Dtlaw.Identity.Controllers
                     pageHandler: null,
                     values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
                     protocol: Request.Scheme);
-                var message = new SendGridMessage()
-                {
-                    From = new EmailAddress(userDto.Email),
-                    Subject = "DTLAW eamil confirmation",
-                    HtmlContent = $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>."
-                };
-                await _emailSender.SendEmailAsync(message);
+                var content = $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.";
+                var message = MailHelper.CreateSingleEmail(
+                    new EmailAddress(_configuration.GetValue<string>("SendGrid.FromAddress")),
+                    new EmailAddress(userDto.Email), 
+                    _configuration.GetValue<string>("SendGrid.Subject"),
+                    content,
+                    content);
+                var response = await _emailSender.SendEmailAsync(message);
+                _logger.LogInformation(response.IsSuccessStatusCode 
+                               ? $"Email to {userDto.Email} queued successfully!"
+                               : $"Failure Email to {userDto.Email}");
                 if (_userManager.Options.SignIn.RequireConfirmedAccount)
                 {
                     return Problem(
