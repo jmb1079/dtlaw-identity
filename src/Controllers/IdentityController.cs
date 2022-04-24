@@ -232,7 +232,7 @@ namespace Dtlaw.Identity.Controllers
 
         private async Task<string> GenerateToken(string userId)
         {
-            byte[] key = Convert.FromBase64String("PennStateIst440WTeam2!@#$");
+            byte[] key = System.Text.Encoding.Unicode.GetBytes("PennStateIst440WTeam2!@#$");
             SymmetricSecurityKey securityKey = new SymmetricSecurityKey(key);
             string issuer = "https://dtlaw-identity.azurewebsites.net";
             string audience = "https://dtlawapi.azurewebsites.net";
