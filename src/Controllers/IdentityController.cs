@@ -111,22 +111,26 @@ namespace Dtlaw.Identity.Controllers
         }
 
         [AllowAnonymous]
-        [HttpGet("confirmemail")]
-        public async Task<IActionResult> ConfirmEmail(string token, string email)
+        [HttpGet("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail(string token, string userId)
         {
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByIdAsync(userId);
             if (user is null)
-                return Problem(statusCode: 404);
+            {
+                string errorDetail = String.Format("Could not find user with id '{0}'", userId);
+                _logger.LogError(errorDetail);
+                return Problem(statusCode: 404, title: "User not found", detail: errorDetail);
+            }
             
             var result = await _userManager.ConfirmEmailAsync(user, token);
             if (result.Succeeded)
             {
-                _logger.LogInformation(String.Format("Email confirmation received for '{0}'", email));
+                _logger.LogInformation(String.Format("Email confirmation received for '{0}'", user.Email));
                 return Ok();
             }
             else
             {
-                string errorDetail = String.Format("Attempt to confirm '{0}' has failed", email);
+                string errorDetail = String.Format("Attempt to confirm '{0}' has failed", user.Email);
                 _logger.LogError(errorDetail);
                 return Problem(statusCode: 401, title: "Confirmation failed", detail: errorDetail);
             }
