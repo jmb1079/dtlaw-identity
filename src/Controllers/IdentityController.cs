@@ -47,7 +47,7 @@ namespace Dtlaw.Identity.Controllers
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto, string? returnUrl = null )
+        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto, [FromBody]string? returnUrl = null )
         {
             returnUrl ??= Url.Content("~/");
             //ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
@@ -110,6 +110,28 @@ namespace Dtlaw.Identity.Controllers
             }
         }
 
+        [AllowAnonymous]
+        [HttpGet("confirmemail")]
+        public async Task<IActionResult> ConfirmEmail(string token, string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user is null)
+                return Problem(statusCode: 404);
+            
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation(String.Format("Email confirmation received for '{0}'", email));
+                return Ok();
+            }
+            else
+            {
+                string errorDetail = String.Format("Attempt to confirm '{0}' has failed", email);
+                _logger.LogError(errorDetail);
+                return Problem(statusCode: 401, title: "Confirmation failed", detail: errorDetail);
+            }
+        }
+
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
@@ -163,7 +185,7 @@ namespace Dtlaw.Identity.Controllers
             var userId = await _userManager.GetUserIdAsync(user);
             var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var callbackUrl = Url.Page(
-                "/Account/ConfirmEmail",
+                "/Identity/ConfirmEmail",
                 pageHandler: null,
                 values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
                 protocol: Request.Scheme);
