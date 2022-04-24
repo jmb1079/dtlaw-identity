@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authentication;
 using SendGrid.Helpers.Mail;
 using System.Text.Encodings.Web;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Dtlaw.Identity.Controllers
 {
@@ -84,7 +86,8 @@ namespace Dtlaw.Identity.Controllers
             {
                 _logger.LogInformation(String.Format("User '{0}' logged in", loginDto.Email));
                 var user = await _userManager.FindByNameAsync(loginDto.Email);
-                var token = await _userManager.GenerateUserTokenAsync(user,TokenOptions.DefaultAuthenticatorProvider, "API");
+                string token = await GenerateToken(user.Id);
+
                 return Ok( new
                 {
                     Username = loginDto.Email,
@@ -225,6 +228,30 @@ namespace Dtlaw.Identity.Controllers
                     $"Ensure that '{nameof(IdentityUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
                     $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml");
             }
+        }
+
+        private async Task<string> GenerateToken(string userId)
+        {
+            byte[] key = Convert.FromBase64String("PennStateIst440WTeam2!@#$");
+            SymmetricSecurityKey securityKey = new SymmetricSecurityKey(key);
+            string issuer = "https://dtlaw-identity.azurewebsites.net";
+            string audience = "https://dtlawapi.azurewebsites.net";
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var claims = await _userManager.GetClaimsAsync(await _userManager.FindByIdAsync(userId));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, userId));
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, userId),
+                }),
+                Expires = DateTime.UtcNow.AddMinutes(30),
+                Issuer = issuer,
+                Audience = audience,
+                SigningCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }
